@@ -3,17 +3,22 @@ import logging
 import joblib
 import pandas as pd
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, median_absolute_error
+import mlflow
+from mlflow.models import infer_signature
 
-# TODO : Dans une second temps, récupérer le client mlflow nous permettant de télécharger les artifacts enregistrés à l'étape précédente
-
+client = mlflow.MlflowClient()
 
 
 def validate(model_path: str, x_test_path: str, y_test_path: str) -> None:
     logging.warning(f"validate {model_path}")
-    model = joblib.load(model_path)
+    model = joblib.load(client.download_artifacts(run_id=mlflow.active_run().info.run_id, path=model_path))
 
-    x_test = pd.read_csv(x_test_path, index_col=False)
-    y_test = pd.read_csv(y_test_path, index_col=False)
+    x_test = pd.read_csv(
+        client.download_artifacts(run_id=mlflow.active_run().info.run_id, path=x_test_path), index_col=False
+    )
+    y_test = pd.read_csv(
+        client.download_artifacts(run_id=mlflow.active_run().info.run_id, path=y_test_path), index_col=False
+    )
 
     x_test = pd.get_dummies(x_test)
 
@@ -43,12 +48,21 @@ def validate(model_path: str, x_test_path: str, y_test_path: str) -> None:
         feature_importance = {name: 0.0 for name in feature_names}
         logging.warning("Model does not have feature importance attributes")
 
-    logging.warning(f"mse : {mse}")
-    logging.warning(f"mae : {mae}")
-    logging.warning(f"r2 : {r2}")
-    logging.warning(f"medae : {medae}")
-    logging.warning(f"feature importance : {feature_importance}")
-    # TODO : Dans un second temps, récupérer le model depuis mlflow
+    mlflow.log_metric("mse", mse)
+    mlflow.log_metric("mae", mae)
+    mlflow.log_metric("r2", r2)
+    mlflow.log_metric("medae", medae)
+    mlflow.log_dict(feature_importance, "feature_importance.json")
 
-    # TODO : Dans un second temps, enregistrer le model dans mlflow
+    model_info = mlflow.sklearn.log_model(
+        model, name="model_final", signature=infer_signature(x_test, y_pred), input_example=x_test.head(10)
+    )
+    logging.warning(f"artifact path {model_info.artifact_path}")
+    logging.warning(f"model uri {model_info.model_uri}")
+    logging.warning(f"model uuid {model_info.model_uuid}")
+    logging.warning(f"model metadata {model_info.metadata}")
 
+    try:
+        mlflow.register_model(model_info.model_uri, "model_registered")
+    except Exception as e:
+        logging.error(f"Erreur registry: {e}")
