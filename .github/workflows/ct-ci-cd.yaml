@@ -138,5 +138,5 @@ jobs:
           # Une fois l'API développée, et sécurisée intégrer : 
           # Download model artifact, Build and push api image, Configure API manifest with OAuth2 domain
           # Deploy api to Openshift with OAuth2 protection, Get OAuth2 token for integration test
-          # Test api with OAuth2 authentication, Asleep kto-mlflow with dailyclean
+          # Test api with OAuth2 authentication, Asleep kto-mlflow with dailyclean 
           
